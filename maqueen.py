@@ -1,15 +1,22 @@
 from micropython import const
-import microbit, machine, utime
+import microbit
+import machine, utime
 import neopixel
 
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255,255,0)
-CYAN = (0, 255, 255)
-MAGENTA = (255, 0, 255)
+BLACK:tuple[int] = (0, 0, 0)
+WHITE:tuple[int] = (255, 255, 255)
+RED:tuple[int] = (255, 0, 0)
+GREEN:tuple[int] = (0, 255, 0)
+BLUE:tuple[int] = (0, 0, 255)
+YELLOW:tuple[int] = (255,255,0)
+CYAN:tuple[int] = (0, 255, 255)
+MAGENTA:tuple[int] = (255, 0, 255)
+
+LEFT_LED:int                = const(0)
+RIGHT_LED:int               = const(1)
+
+LEFT_MOTOR:int              = const(0)
+RIGHT_MOTOR:int             = const(1)
 
 class Maqueen():
 
@@ -42,40 +49,49 @@ class Maqueen():
             self.neopixel = neopixel.NeoPixel(microbit.pin15, Maqueen.NEOPIXELS_N, bpp=3)
             self.neopixel.clear()
 
-
-            
-
         Maqueen.is_initialized = True
 
         microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_LED_REGISTER, 0, 0]))
-        self.setLeftMotor(0, 0)
-        self.setRightMotor(0, 0)
+        self.stopMotor()
         pass
 
-    def setLeftMotor(self, speed:int, dir:int):
+    def setMotor(self, speed:int, dir:int, motor:int|None=None) -> int:
+        if not Maqueen.is_initialized:
+            print("Not initialized!")
+            return -1
         # speed is a percentage (0 - 100)
         # when dir == 1, cw; ccw when dir is 0
         speed_scaled = int(microbit.scale(speed, from_=(0, 100), to=(0, 255)))
-        microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_MOTOR_REGISTER, dir, speed_scaled]))
 
-    def setRightMotor(self, speed:int, dir:int):
-        # speed is a percentage (0 - 100)
-        # when dir == 1, cw; ccw when dir is 0
-        speed_scaled = int(microbit.scale(speed, from_=(0, 100), to=(0, 255)))
-        microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.RIGHT_MOTOR_REGISTER, dir, speed_scaled]))
+        if motor == LEFT_MOTOR:
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_MOTOR_REGISTER, dir, speed_scaled]))
+        elif motor == RIGHT_MOTOR:
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.RIGHT_MOTOR_REGISTER, dir, speed_scaled]))
+        else:
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_MOTOR_REGISTER, dir, speed_scaled, dir, speed_scaled]))
 
-    def toggleLeftLED(self):
-        self.left_led_state = not self.left_led_state
-        microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_LED_REGISTER, self.left_led_state]))
+        return 0
 
-    def toggleRightLED(self):
-        self.right_led_state = not self.right_led_state
-        microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.RIGHT_LED_REGISTER, self.right_led_state]))
+    def stopMotor(self, motor:int|None=None) -> int:
+        return self.setMotor(0, 0, motor)
 
-    def toggleLED(self):
-        self.left_led_state = not self.left_led_state
-        self.right_led_state = not self.right_led_state
-        microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_LED_REGISTER, self.left_led_state, self.right_led_state]))
+    def toggleLED(self, led:int|None=None) -> int:
+        if not Maqueen.is_initialized:
+            print("Not initialized!")
+            return -1
+
+        if led == LEFT_LED:
+            self.left_led_state = not self.left_led_state
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_LED_REGISTER, self.left_led_state]))
+        elif led == RIGHT_LED:
+            self.right_led_state = not self.right_led_state
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.RIGHT_LED_REGISTER, self.right_led_state]))
+        else:
+            self.left_led_state = not self.left_led_state
+            self.right_led_state = not self.right_led_state
+            microbit.i2c.write(Maqueen.I2C_ADDR, bytes([Maqueen.LEFT_LED_REGISTER, self.left_led_state, self.right_led_state]))
+
+        return 0
 
     def setNeoPixel(self, rgb:tuple[int]|list[int], i:int|None=None) -> int:
         r, g, b = rgb
@@ -109,6 +125,9 @@ class Maqueen():
         return 0
 
     def readUltrasonicSensor(self) -> int|float:
+        if not Maqueen.is_initialized:
+            print("Not initialized!")
+            return -1
         microbit.pin13.write_digital(0)
         utime.sleep_us(5)
 
@@ -138,14 +157,3 @@ class Maqueen():
             self.neopixel[i] = (0, 0, 0)
             self.neopixel.show()
         self.neopixel.clear()
-
-
-if __name__=="__main__":
-    microbit.uart.init(115200)
-
-    robot = Maqueen()
-    robot.setLeftMotor(0, 1)
-    robot.setRightMotor(0, 1)
-    # while True:
-    #     microbit.uart.write("Distance in cm:\t")
-    #     microbit.uart.write(str(robot.readUltrasonicSensor()) + "\r\n")
