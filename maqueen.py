@@ -25,7 +25,8 @@ LINE_SENSOR_R1:int          = const(3)
 LINE_SENSOR_R2:int          = const(4)
 
 class Maqueen():
-    # I just took this from the maqueen github repo
+    # I just took this from the maqueen github repo:
+    # https://github.com/DFRobot/pxt-DFRobot_MaqueenPlus_v20/blob/master/maqueenPlusV2.ts#L253
     I2C_ADDR                = const(0x10)
     VERSION_CNT_REGISTER    = const(0x32)
     VERSION_DATA_REGISTER   = const(0x33)
@@ -48,6 +49,7 @@ class Maqueen():
         self.left_led_state:int = 0
         self.right_led_state:int = 0
         self.neopixel:neopixel.NeoPixel = None
+        self.brightness = 100
 
         if not Maqueen.is_initialized:
             microbit.display.scroll("JB")
@@ -118,6 +120,15 @@ class Maqueen():
 
         return 0
 
+    def setBrightness(self,brightness:int) -> int:
+        # brightness is a value from 0 to 100
+        if brightness < 0 or brightness > 100:
+            print("Not a valid value!")
+            return -1
+
+        self.brightness = brightness
+        return 0
+
     def setNeoPixel(self, rgb:tuple[int]|list[int], i:int|None=None) -> int:
         r, g, b = rgb
         if not Maqueen.is_initialized:
@@ -128,11 +139,15 @@ class Maqueen():
             print("Invalid rgb values!")
             return -1
 
-        if i and (i < 0 or i > Maqueen.NEOPIXELS_N):
+        if (i is not None) and (i < 0 or i > Maqueen.NEOPIXELS_N):
             print("Invalid NeoPixel index!")
             return -1
 
-        if i:
+        r = r*self.brightness//100
+        g = g*self.brightness//100
+        b = b*self.brightness//100
+
+        if i is not None:
             self.neopixel[i] = (r, g, b)
         else:
             for j in range(Maqueen.NEOPIXELS_N):
@@ -238,23 +253,14 @@ class Maqueen():
         print(microbit.i2c.scan())
 
     def _testNeoPixels(self):
-        for i in range(Maqueen.NEOPIXELS_N):
-            for r in range(255):
-                for g in range(255):
-                    for b in range(255):
-                        self.neopixel[i] = (r, g, b)
-                        self.neopixel.show()
-                        microbit.sleep(500)
-            self.neopixel[i] = (0, 0, 0)
-            self.neopixel.show()
-        self.neopixel.clear()
-
-
-if __name__=="__main__":
-    robot = Maqueen()
-    microbit.uart.init(115200)
-
-    while True:
-        data = robot.readLineSensorState(LINE_SENSOR_M)
-        microbit.uart.write("Line sensor states: " + str(data) + "\r\n")
-        microbit.sleep(1000)
+        for brightness in range(10, 100, 10):
+            self.setBrightness(brightness)
+            for i in range(Maqueen.NEOPIXELS_N):
+                for r in range(0, 255, 50):
+                    for g in range(0, 255, 50):
+                        for b in range(0, 255, 50):
+                            self.setNeoPixel((r, g, b), i=i)
+                            print(self.neopixel[0], self.neopixel[1], self.neopixel[2], self.neopixel[3])
+                            microbit.sleep(100)
+                self.setNeoPixel((0, 0, 0), i=i)
+        self.clearNeoPixel()
